@@ -185,13 +185,9 @@ def test_extract_allowed_with_valid_api_key(monkeypatch):
 
 
 def test_unhandled_exception_never_leaks_internal_details():
-    # Регрессия: необработанное исключение раньше возвращало str(exc)
-    # клиенту всегда, кроме DOCFORGE_ENVIRONMENT=production. Теперь ответ
-    # всегда generic, независимо от environment — проверяем это напрямую,
-    # подставив зависимость, которая падает с "секретной" деталью.
     from src.api.dependencies import get_generator
 
-    password = "secret_detail"  # noqa: S105
+    secret_detail = "internal server error detail"
 
     class _BoomGenerator:
         def generate(self, template_name, data):
