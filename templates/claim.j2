@@ -1,0 +1,25 @@
+{{ court_name }}
+
+Истец: {{ plaintiff }}
+Ответчик: {{ defendant }}
+Дело № {{ case_number }}
+
+ИСКОВОЕ ЗАЯВЛЕНИЕ
+о взыскании задолженности
+
+{{ plaintiff }} (далее — Истец) обращается в {{ court_name }} с исковым заявлением к {{ defendant }} (далее — Ответчик) о взыскании задолженности в размере {{ claim_amount }} руб.
+
+Правовое обоснование: ст. {{ legal_articles }}.
+
+На основании изложенного и руководствуясь ст. {{ legal_articles }}, прошу:
+
+1. Взыскать с Ответчика в пользу Истца задолженность в размере {{ claim_amount }} руб.
+
+Приложения:
+{% for item in attachments %}
+{{ loop.index }}. {{ item }}
+{% endfor %}
+
+{{ date }}
+
+{{ plaintiff_representative }} _______________ / {{ plaintiff }} /
