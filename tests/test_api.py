@@ -193,9 +193,10 @@ def test_unhandled_exception_never_leaks_internal_details():
         def generate(self, template_name, data):
             raise RuntimeError(secret_detail)
 
-    app.dependency_overrides[get_generator] = lambda: _BoomGenerator()
+        app.dependency_overrides[get_generator] = lambda: _BoomGenerator()
+    local_client = TestClient(app, raise_server_exceptions=False)
     try:
-        response = client.post(
+        response = local_client.post(
             "/generate/claim",
             json={
                 "plaintiff": "ООО Тест",
@@ -206,6 +207,7 @@ def test_unhandled_exception_never_leaks_internal_details():
         )
     finally:
         app.dependency_overrides.pop(get_generator, None)
+
 
     assert response.status_code == 500
     assert secret_detail not in response.text
