@@ -3,12 +3,14 @@ import os
 from src.core.config import Settings
 
 
-def test_settings_defaults():
+def test_settings_defaults(monkeypatch):
+    monkeypatch.delenv("DOCFORGE_ENVIRONMENT", raising=False)
     s = Settings()
     assert s.environment == "development"
     assert s.is_production is False
     assert s.max_extraction_text_length > 0
     assert s.max_request_body_bytes > 0
+
 
 
 def test_settings_reads_env_prefix(monkeypatch):
