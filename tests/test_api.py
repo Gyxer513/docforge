@@ -191,7 +191,7 @@ def test_unhandled_exception_never_leaks_internal_details():
     # подставив зависимость, которая падает с "секретной" деталью.
     from src.api.dependencies import get_generator
 
-    secret_detail = "internal-connection-string-xyz-12345"
+    password = "secret_detail"  # noqa: S105
 
     class _BoomGenerator:
         def generate(self, template_name, data):
