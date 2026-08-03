@@ -1,0 +1,22 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Явно фиксируем версию Python, чтобы Render не выбрал 3.14 (там для pydantic-core
+# ещё нет прекомпилированных wheel-ов, и pip уходит в сборку через maturin/Rust,
+# которая падает в стандартном билд-окружении Render — это и была причина
+# "metadata-generation-failed" в логах).
+services:
+  - type: web
+    name: docforge
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn src.api.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DOCFORGE_ENVIRONMENT
+        value: production
+      - key: DOCFORGE_LOG_LEVEL
+        value: INFO

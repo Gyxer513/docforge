@@ -1,0 +1,87 @@
+# Changelog
+
+Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
+версионирование — [SemVer](https://semver.org/lang/ru/).
+
+## [Unreleased]
+
+### Changed
+- **Breaking:** `/generate/contract` теперь принимает отдельную схему
+  `ContractGenerateRequest` (`customer`, `contractor`, `contract_amount`,
+  `contract_number`, ...) вместо переиспользованной `GenerateRequest` с
+  процессуальными полями `plaintiff`/`defendant`, которые для договора не
+  имели смысла и требовали молчаливого ремаппинга внутри эндпоинта.
+  Клиентам, уже вызывающим `/generate/contract`, нужно обновить тело
+  запроса под новые имена полей.
+- Три `generate/*`-эндпоинта больше не дублируют сборку HTTP-ответа —
+  вынесена в общий `_docx_response()`.
+- `ClaimData`/`AppealData` в `engine/templates.py` больше не дублируют 8 из
+  9 полей дословно — вынесены в общий `_BaseLitigationData`.
+
+### Added
+- Rate limiting (`slowapi`), ключ — API-key или IP, лимит настраивается
+  через `DOCFORGE_RATE_LIMIT`.
+- Опциональная аутентификация по `X-API-Key` (`DOCFORGE_API_KEYS`).
+- CI: реальная сборка Docker-образа + smoke-test `/health` в контейнере на
+  каждый PR; публикация `edge`-тега в GHCR при пуше в `main`.
+- CI: `scripts/check_deps_sync.py` — билд падает, если `pyproject.toml` и
+  `requirements.txt` расходятся по версиям пакетов.
+
+### Security
+- Сравнение `X-API-Key` переведено на `hmac.compare_digest` — обычное `in`
+  сравнение строк не constant-time и в теории позволяет timing-атаку.
+- Необработанные исключения больше никогда не возвращают `str(exc)`
+  клиенту — раньше это происходило всегда, если `DOCFORGE_ENVIRONMENT !=
+  "production"`, а дефолт именно "development" (в т.ч. в поставляемом
+  `docker-compose.yml`). Теперь ответ всегда generic, деталь — только в логе.
+- `TemplateNotFoundError` и `GenerationError` раньше включали в сообщение
+  клиенту абсолютный путь на файловой системе сервера и сырой текст
+  внутреннего исключения соответственно — причём **без** гейта по
+  environment, то есть утечка происходила и в "production". Оба сообщения
+  теперь безопасны для показа клиенту, полная деталь остаётся в логе.
+- Ленивая загрузка NER-моделей в `EntityExtractor` (`functools.cached_property`
+  вместо загрузки на уровне модуля при импорте) — не security-фикс сам по
+  себе, но убирает лишнюю поверхность инициализации при простом импорте
+  модуля и ускоряет тестовый прогон.
+
+### Fixed
+- `/generate/contract` подставлял захардкоженные `contract_date` ("01.07.2026",
+  всегда одна и та же дата в будущем) и `contractor_representative`
+  ("Иванов И.И.", случайное имя, не связанное с реальным контрагентом).
+  Дата теперь берётся из `date.today()`, представитель — из поля запроса
+  `contractor_representative` с нейтральным дефолтом.
+- `EntityExtractor.extract()` мог вернуть одинаковое имя в `plaintiff` и
+  `defendant`, если в тексте не нашлось ни одной организации: обе роли
+  независимо откатывались на `persons[0]`. Резолюция сторон переписана на
+  единый пул кандидатов (`_resolve_parties`) — ответчик теперь либо реальный
+  второй кандидат, либо явно пустой, с предупреждением в логах, но никогда
+  не дублирует истца.
+- `/version` всегда возвращал `0.0.0-dev` в Docker/Render/Railway, потому
+  что `importlib.metadata.version("docforge")` не находит метаданные —
+  пакет никогда не ставится через `pip install .` в рантайм-образе.
+  Версия теперь читается напрямую из `pyproject.toml`.
+- `docker-compose.yml` ссылался на `env_file: .env`, которого нет в свежем
+  клоне репозитория — `docker compose up` падал бы из коробки. Убран
+  жёсткий `env_file`, все настройки имеют дефолты в `Settings`.
+
+## [1.0.0] — 2026-07-09
+
+### Added
+- Первая production-ready версия: генерация исковых заявлений, апелляционных
+  жалоб и договоров через FastAPI + Jinja2 + python-docx.
+- Извлечение сущностей из текста судебных решений через Natasha + regex.
+- Логирование, конфигурация через pydantic-settings, StrictUndefined в Jinja2.
+- Защита от path traversal при загрузке шаблонов, лимит размера тела запроса.
+- Docker (multi-stage, non-root), CI (lint/test/docker), релизный workflow в GHCR.
+- Деплой-конфиги для Render, Railway (Procfile), Fly.io.
+
+### Fixed
+- Деплой на Render падал с `metadata-generation-failed` при сборке
+  `pydantic-core` — платформа выбирала неподдерживаемый Python 3.14, для
+  которого ещё нет готовых wheel-ов. Зафиксирована версия 3.11.9 через
+  `runtime.txt`, `.python-version` и `requires-python` в `pyproject.toml`.
+- `span.type == "MONEY"` в экстракторе никогда не срабатывал (Natasha NER не
+  поддерживает этот тип) — сумма иска теперь всегда берётся из regex.
+- Regex номера дела не покрывал часть форматов судов — расширен.
+- Генерация `.docx` через общий путь `/tmp/document.docx` могла привести к
+  гонке данных при параллельных запросах — заменена на генерацию в памяти.
