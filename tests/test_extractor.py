@@ -12,6 +12,27 @@ def test_extract_entities(extractor, sample_ruling_text):
     assert result.claim_amount != "Не указана"
 
 
+def test_extract_entities_from_general_jurisdiction_ruling(extractor):
+    """Решение суда общей юрисдикции, а не арбитража.
+
+    Раньше на таком тексте extract() не находил ни суда (паттерн начинался со
+    слова «Арбитражный»), ни номера дела (требовался код суда из кириллических
+    букв перед цифрами) — то есть половина российских судебных актов
+    возвращала пустой результат по всем regex-полям сразу.
+    """
+    text = (
+        "Замоскворецкий районный суд города Москвы в составе судьи Ёлкиной А.Б. "
+        'рассмотрел дело № 2-1234/2024 по иску ООО "Ромашка" '
+        "к Иванову Ивану Ивановичу о взыскании задолженности "
+        "в размере 150 000 рублей."
+    )
+    result = extractor.extract(text)
+    assert result.court == "Замоскворецкий районный суд города Москвы"
+    assert result.case_number == "2-1234/2024"
+    assert result.judge == "Ёлкиной А.Б."
+    assert result.claim_amount != "Не указана"
+
+
 def test_extract_empty_text(extractor):
     with pytest.raises(ExtractionError):
         extractor.extract("")
@@ -24,6 +45,9 @@ def test_extract_empty_text(extractor):
         ("дело №А12-1234/2024", "А12-1234/2024"),
         ("Дело № СИП-15/2024", "СИП-15/2024"),
         ("дело № Ф05-6789/26", "Ф05-6789/26"),
+        # Общая юрисдикция и Верховный Суд — номер начинается с цифр.
+        ("Дело № 2-1234/2024", "2-1234/2024"),
+        ("дело № 5-КГ24-15-К2", "5-КГ24-15-К2"),
     ],
 )
 def test_extract_various_case_number_formats(extractor, case_number_text, expected):
